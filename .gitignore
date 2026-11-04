@@ -1,0 +1,18 @@
+# Installed dependencies
+node_modules/
+
+# Compiled application
+dist/
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Test coverage and logs
+coverage/
+*.log
+
+# Operating-system files
+.DS_Store
+Thumbs.db
