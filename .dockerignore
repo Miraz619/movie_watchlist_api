@@ -1,0 +1,19 @@
+# Host dependencies and compiled output
+node_modules
+dist
+
+# Git history
+.git
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Test output and logs
+coverage
+*.log
+
+# Operating-system files
+.DS_Store
+Thumbs.db
