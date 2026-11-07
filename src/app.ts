@@ -1,6 +1,6 @@
 import express from "express";
 import { userRoutes } from "./modules/user/user.route.js";
-
+import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 
 const app = express();
 
@@ -15,4 +15,6 @@ app.get("/health", (_req, res) => {
   });
 });
 
+
+app.use(globalErrorHandler);
 export default app;

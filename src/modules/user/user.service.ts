@@ -5,6 +5,7 @@ import { users } from "../../db/schema/users.js";
 import type { SignupInput } from "./user.validation.js";
 import { eq } from "drizzle-orm";
 import { profiles } from "../../db/schema/profiles.js";
+import { AppError } from "../../errors/AppError.js";
 
 const registerUserIntoDB = async (payload: SignupInput) => {
 const { name, email, password, photoReference, bio } = payload;
@@ -14,7 +15,7 @@ const { name, email, password, photoReference, bio } = payload;
   .where(eq(users.email, email));
 
 if (existingUser) {
-  throw new Error("User with this email already exists");
+  throw new AppError(409, "User with this email already exists");
 }
 
   const passwordHash = await bcrypt.hash(
