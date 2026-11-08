@@ -6,16 +6,7 @@ export const validateRequest = (schema: ZodType): RequestHandler => {
     const result = schema.safeParse(req.body);
 
     if (!result.success) {
-      res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: result.error.issues.map((issue) => ({
-          field: issue.path.join("."),
-          message: issue.message,
-        })),
-      });
-
-      return;
+      return next(result.error);
     }
 
     req.body = result.data;
