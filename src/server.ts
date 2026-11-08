@@ -1,4 +1,5 @@
-import "dotenv/config";
+
+
 import { sql } from "drizzle-orm";
 
 import app from "./app.js";
