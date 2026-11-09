@@ -57,6 +57,44 @@ if (existingUser) {
   }
 };
 
+
+const getMyProfileFromDB = async (userId: string) => {
+  const [result] = await db
+    .select({
+      user: {
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        isActive: users.isActive,
+        createdAt: users.createdAt,
+      },
+      profile: {
+        id: profiles.id,
+        photoReference: profiles.photoReference,
+        bio: profiles.bio,
+        createdAt: profiles.createdAt,
+        updatedAt: profiles.updatedAt,
+      },
+    })
+    .from(users)
+    .leftJoin(profiles, eq(users.id, profiles.userId))
+    .where(eq(users.id, userId));
+
+  if (!result) {
+    throw new AppError(401, "User no longer exists. Please log in again");
+  }
+
+  if (!result.user.isActive) {
+    throw new AppError(403, "Your account is inactive");
+  }
+
+  return result;
+};
+
+
+
 export const userService = {
   registerUserIntoDB,
+  getMyProfileFromDB,
 };

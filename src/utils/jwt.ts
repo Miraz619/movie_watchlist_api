@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import type { SignOptions } from "jsonwebtoken";
+import { AppError } from "../errors/AppError.js";
 
 const createToken = (
   payload: object,
@@ -13,12 +14,22 @@ const createToken = (
 };
 
 const verifyToken = (token: string, secret: string) => {
-  const decoded = jwt.verify(token, secret, {
-    algorithms: ["HS256"],
-  });
+  let decoded;
+
+  try {
+    decoded = jwt.verify(token, secret, {
+      algorithms: ["HS256"],
+    });
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new jwt.JsonWebTokenError("Invalid token payload", error);
+    }
+
+    throw error;
+  }
 
   if (typeof decoded === "string") {
-    throw new Error("Invalid token payload");
+    throw new jwt.JsonWebTokenError("Invalid token payload");
   }
 
   return decoded;

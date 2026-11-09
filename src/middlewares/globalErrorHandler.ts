@@ -1,7 +1,7 @@
 import type { ErrorRequestHandler } from "express";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { ZodError } from "zod";
-
+import jwt from "jsonwebtoken";
 import { AppError } from "../errors/AppError.js";
 import type { IErrorResponse } from "../interfaces/error.interface.js";
 
@@ -28,7 +28,7 @@ export const globalErrorHandler: ErrorRequestHandler = (
     response.statusCode = error.statusCode;
     response.message = error.message;
 
-  // 2. Zod validation errors
+    // 2. Zod validation errors
   } else if (error instanceof ZodError) {
     response.statusCode = 400;
     response.message = "Validation error";
@@ -38,12 +38,13 @@ export const globalErrorHandler: ErrorRequestHandler = (
       message: issue.message,
     }));
 
-  // 3. Drizzle / PostgreSQL errors
+    // 3. JWT errors
+  } else if (error instanceof jwt.JsonWebTokenError) {
+    response.statusCode = 401;
+    response.message = "Invalid or expired token";
   } else {
     const originalError =
-      error instanceof DrizzleQueryError
-        ? error.cause
-        : error;
+      error instanceof DrizzleQueryError ? error.cause : error;
 
     if (
       originalError &&
