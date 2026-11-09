@@ -5,15 +5,32 @@ import { authService } from "./auth.service.js";
 
 const loginUser = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    const user = await authService.loginUser(req.body);
+    const { accessToken, refreshToken } = await authService.loginUser(req.body);
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     sendResponse(res, {
       success: true,
       statusCode: 200,
       message: "User logged in successfully",
-      data: user,
+      data: {
+        accessToken,
+        refreshToken,
+      },
     });
-  }
+  },
 );
 
 export const authController = {

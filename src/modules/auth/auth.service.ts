@@ -6,6 +6,7 @@ import { AppError } from "../../errors/AppError.js";
 import bcrypt from "bcryptjs";
 import config from "../../config/index.js";
 import { jwtUtils } from "../../utils/jwt.js";
+import { SignOptions } from "jsonwebtoken";
 
 const loginUser = async (payload: LoginInput) => {
   const { email, password } = payload;
@@ -32,21 +33,21 @@ const loginUser = async (payload: LoginInput) => {
 const accessToken = jwtUtils.createToken(
   jwtPayload,
   config.jwt_access_secret,
-  "15m"
+  config.jwt_access_expires_in as SignOptions["expiresIn"]
 );
 
 // Refresh token
 const refreshToken = jwtUtils.createToken(
   jwtPayload,
   config.jwt_refresh_secret,
-  "7d"
+  config.jwt_refresh_expires_in as SignOptions["expiresIn"]
 );
 
   return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
+     
+      accessToken,
+      refreshToken,
+    
   };
 };
 
