@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import config from "../../config/index.js";
 import { db } from "../../db/index.js";
 import { users } from "../../db/schema/users.js";
-import type { SignupInput } from "./user.validation.js";
+import type { SignupInput, UpdateProfileInput } from "./user.validation.js";
 import { eq } from "drizzle-orm";
 import { profiles } from "../../db/schema/profiles.js";
 import { AppError } from "../../errors/AppError.js";
@@ -92,9 +92,50 @@ const getMyProfileFromDB = async (userId: string) => {
   return result;
 };
 
+const updateMyProfileInDB = async (
+  userId: string,
+  payload: UpdateProfileInput,
+) => {
+  const { name, photoReference, bio } = payload;
 
+  await getMyProfileFromDB(userId);
+
+  await db.transaction(async (tx) => {
+    if (name) {
+      await tx
+        .update(users)
+        .set({ name })
+        .where(eq(users.id, userId));
+    }
+
+    if (photoReference !== undefined || bio !== undefined) {
+      const [profile] = await tx
+        .update(profiles)
+        .set({
+          photoReference,
+          bio,
+        })
+        .where(eq(profiles.userId, userId))
+        .returning({ id: profiles.id });
+
+      if (!profile) {
+        throw new AppError(404, "Profile not found");
+      }
+    }
+  });
+
+  return getMyProfileFromDB(userId);
+};
+
+const deleteMyProfileFromDB = async (userId: string) => {
+  await db
+    .delete(profiles)
+    .where(eq(profiles.userId, userId));
+};
 
 export const userService = {
   registerUserIntoDB,
   getMyProfileFromDB,
+  updateMyProfileInDB,
+  deleteMyProfileFromDB,
 };

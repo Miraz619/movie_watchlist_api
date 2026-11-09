@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import config from "../../config/index.js";
 import { jwtUtils } from "../../utils/jwt.js";
 import { SignOptions } from "jsonwebtoken";
+import { z } from "zod";
 
 const loginUser = async (payload: LoginInput) => {
   const { email, password } = payload;
@@ -51,7 +52,51 @@ const refreshToken = jwtUtils.createToken(
   };
 };
 
+
+const refreshToken = async (token: string) => {
+  const decoded = jwtUtils.verifyToken(
+    token,
+    config.jwt_refresh_secret,
+  );
+
+  const userId = z.uuid().safeParse(decoded.sub);
+
+  if (!userId.success) {
+    throw new AppError(401, "Invalid refresh token");
+  }
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      role: users.role,
+      isActive: users.isActive,
+    })
+    .from(users)
+    .where(eq(users.id, userId.data));
+
+  if (!user) {
+    throw new AppError(401, "User no longer exists. Please log in again");
+  }
+
+  if (!user.isActive) {
+    throw new AppError(403, "Your account is inactive");
+  }
+
+  const accessToken = jwtUtils.createToken(
+    {
+      sub: user.id,
+      role: user.role,
+    },
+    config.jwt_access_secret,
+    config.jwt_access_expires_in as SignOptions["expiresIn"],
+  );
+
+  return { accessToken };
+};
+
+
 export const authService = {
   loginUser,
+  refreshToken,
   
 };
