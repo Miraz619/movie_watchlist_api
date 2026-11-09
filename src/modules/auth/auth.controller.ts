@@ -60,7 +60,34 @@ const refreshToken = catchAsync(
   },
 );
 
+const signout = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.cookies?.refreshToken;
+
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    if (typeof token === "string" && token) {
+      await authService.signout(token);
+    }
+
+    res.status(204).send();
+  },
+);
+
 export const authController = {
   loginUser,
   refreshToken,
+  signout,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
 };
