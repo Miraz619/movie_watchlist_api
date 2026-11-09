@@ -43,7 +43,41 @@ const getMyProfile = catchAsync(
   },
 );
 
+const updateMyProfile = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      throw new AppError(401, "Authentication required");
+    }
+
+    const updatedProfile = await userService.updateMyProfileInDB(
+      req.user.id,
+      req.body,
+    );
+
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Profile updated successfully",
+      data: updatedProfile,
+    });
+  },
+);
+
+const deleteMyProfile = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      throw new AppError(401, "Authentication required");
+    }
+
+    await userService.deleteMyProfileFromDB(req.user.id);
+
+    res.status(204).send();
+  },
+);
+
 export const userController = {
   registerUser,
   getMyProfile,
+  updateMyProfile,
+  deleteMyProfile,
 };
