@@ -28,24 +28,11 @@ const registerUser = catchAsync(async (req: Request, res: Response,next: NextFun
 
 const getMyProfile = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    const accessToken = req.cookies?.accessToken;
-
-    if (typeof accessToken !== "string" || !accessToken) {
+    if (!req.user) {
       throw new AppError(401, "Authentication required");
     }
 
-    const decoded = jwtUtils.verifyToken(
-      accessToken,
-      config.jwt_access_secret,
-    );
-
-    const userId = z.uuid().safeParse(decoded.sub);
-
-    if (!userId.success) {
-      throw new AppError(401, "Invalid access token");
-    }
-
-    const profile = await userService.getMyProfileFromDB(userId.data);
+    const profile = await userService.getMyProfileFromDB(req.user.id);
 
     sendResponse(res, {
       success: true,
