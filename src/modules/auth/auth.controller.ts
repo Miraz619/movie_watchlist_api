@@ -60,6 +60,11 @@ const refreshToken = catchAsync(
   },
 );
 
+
+
+
+
+//signout user
 const signout = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const token = req.cookies?.refreshToken;
@@ -85,6 +90,8 @@ const signout = catchAsync(
     res.status(204).send();
   },
 );
+
+
 
 export const authController = {
   loginUser,

@@ -133,9 +133,36 @@ const deleteMyProfileFromDB = async (userId: string) => {
     .where(eq(profiles.userId, userId));
 };
 
+type Requester = {
+  id: string;
+  role: (typeof users.$inferSelect)["role"];
+};
+
+const deleteUserFromDB = async (
+  userId: string,
+  requester: Requester,
+) => {
+  const isAdmin = requester.role === "admin";
+  const isOwner = requester.id === userId;
+
+  if (!isAdmin && !isOwner) {
+    throw new AppError(403, "You cannot delete this account");
+  }
+
+  const [deletedUser] = await db
+    .delete(users)
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+
+  if (!deletedUser) {
+    throw new AppError(404, "User not found");
+  }
+};
+
 export const userService = {
   registerUserIntoDB,
   getMyProfileFromDB,
   updateMyProfileInDB,
   deleteMyProfileFromDB,
+  deleteUserFromDB,
 };

@@ -11,6 +11,8 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { sessions } from "../../db/schema/sessions.js";
 
+//login user
+
 const loginUser = async (payload: LoginInput) => {
   const { email, password } = payload;
 
@@ -73,6 +75,11 @@ await db.insert(sessions).values({
 };
 
 
+
+
+
+
+//refresh access token using refresh token
 const refreshToken = async (token: string) => {
   const decoded = jwtUtils.verifyToken(
     token,
@@ -147,6 +154,12 @@ if (session.expiresAt.getTime() <= Date.now()) {
   return { accessToken };
 };
 
+
+
+
+
+
+//signout user
 
 const signout = async (token: string) => {
   const decoded = jwtUtils.verifyToken(

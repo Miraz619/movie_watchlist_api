@@ -75,9 +75,29 @@ const deleteMyProfile = catchAsync(
   },
 );
 
+const deleteUser = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      throw new AppError(401, "Authentication required");
+    }
+
+    const userId = z.uuid().parse(req.params.userId).toLowerCase();
+
+    await userService.deleteUserFromDB(userId, req.user);
+
+    if (req.user.id === userId) {
+      res.clearCookie("accessToken", { path: "/" });
+      res.clearCookie("refreshToken", { path: "/" });
+    }
+
+    res.status(204).send();
+  },
+);
+
 export const userController = {
   registerUser,
   getMyProfile,
   updateMyProfile,
   deleteMyProfile,
+  deleteUser,
 };
