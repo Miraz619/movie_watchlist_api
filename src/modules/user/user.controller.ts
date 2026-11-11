@@ -89,8 +89,15 @@ const deleteUser = catchAsync(
       res.clearCookie("accessToken", { path: "/" });
       res.clearCookie("refreshToken", { path: "/" });
     }
+    
 
-    res.status(204).send();
+  sendResponse(res, {
+  statusCode: 200,
+  success: true,
+  message: "User deleted successfully",
+  data: null,
+});
+    
   },
 );
 
