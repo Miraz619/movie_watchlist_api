@@ -26,3 +26,34 @@ export const signupSchema = z.object({
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
+
+
+
+export const updateProfileSchema = z
+  .strictObject({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must have at least 2 characters")
+      .optional(),
+
+    photoReference: z
+      .string()
+      .trim()
+      .min(1, "Photo reference cannot be empty; use null to clear it")
+      .nullable()
+      .optional(),
+
+    bio: z
+      .string()
+      .trim()
+      .min(1, "Bio cannot be empty; use null to clear it")
+      .nullable()
+      .optional(),
+  })
+  .refine(
+    (data) => Object.values(data).some((value) => value !== undefined),
+    "Provide at least one field to update",
+  );
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
