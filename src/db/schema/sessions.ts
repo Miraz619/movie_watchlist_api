@@ -2,7 +2,9 @@ import {
   pgTable,
   timestamp,
   uuid,
+  text,
 } from "drizzle-orm/pg-core";
+
 import { users } from "./users.js";
 
 export const sessions = pgTable("sessions", {
@@ -13,6 +15,8 @@ export const sessions = pgTable("sessions", {
     .references(() => users.id, {
       onDelete: "cascade",
     }),
+
+  refreshTokenHash: text("refresh_token_hash"),
 
   expiresAt: timestamp("expires_at", {
     withTimezone: true,
