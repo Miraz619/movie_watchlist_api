@@ -26,6 +26,7 @@ router.delete(
   auth(),
   userController.deleteMyProfile,
 );
+
 router.delete("/:userId", auth(), userController.deleteUser);
 
 export const userRoutes = router;

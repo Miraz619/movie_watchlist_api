@@ -28,7 +28,7 @@ export const auth = (...requiredRoles: Role[]) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const token = req.cookies?.accessToken;
 
-      if (typeof token !== "string" || !token) {
+      if (!token) {
         throw new AppError(401, "Authentication required");
       }
 
