@@ -6,7 +6,7 @@ import { AppError } from "../../errors/AppError.js";
 
 const loginUser = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { accessToken, refreshToken } = await authService.loginUser(req.body);
+    const { accessToken, refreshToken, user } = await authService.loginUser(req.body);
 
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
@@ -26,10 +26,7 @@ const loginUser = catchAsync(
       success: true,
       statusCode: 200,
       message: "User logged in successfully",
-      data: {
-        accessToken,
-        refreshToken,
-      },
+      data: user,
     });
   },
 );
