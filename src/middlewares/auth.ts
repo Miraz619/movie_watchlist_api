@@ -7,7 +7,7 @@ import { users } from "../db/schema/users.js";
 import { AppError } from "../errors/AppError.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { jwtUtils } from "../utils/jwt.js";
-
+import { sessions } from "../db/schema/sessions.js";
 type Role = (typeof users.$inferSelect)["role"];
 
 declare global {
@@ -42,7 +42,39 @@ export const auth = (...requiredRoles: Role[]) => {
       if (!userId.success) {
         throw new AppError(401, "Invalid access token");
       }
+      
+      const sessionId = z.uuid().safeParse(decoded.sid);
 
+if (!sessionId.success) {
+  throw new AppError(401, "Invalid session ID");
+}
+
+  const [session] = await db
+  .select({
+    revokedAt: sessions.revokedAt,
+    expiresAt: sessions.expiresAt,
+  })
+  .from(sessions)
+  .where(
+    and(
+      eq(sessions.id, sessionId.data),
+      eq(sessions.userId, userId.data),
+    ),
+  );
+
+if (
+  !session ||
+  session.revokedAt !== null ||
+  session.expiresAt.getTime() <= Date.now()
+) {
+  throw new AppError(
+    401,
+    "Session expired or revoked. Please log in again",
+  );
+}
+
+
+     //check if the user exists and is active
       const [user] = await db
         .select({
           id: users.id,
@@ -64,6 +96,10 @@ export const auth = (...requiredRoles: Role[]) => {
       if (!user.isActive) {
         throw new AppError(403, "Your account is inactive");
       }
+
+
+      //check if the user has the required role to access the route
+
 
       if (
         requiredRoles.length &&

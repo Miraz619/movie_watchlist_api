@@ -261,6 +261,9 @@ const refreshToken = async (token: string) => {
 
   const incomingTokenHash = hashToken(token);
 
+
+  //check if the incoming token hash matches the stored hash, if not revoke the session and throw an error
+  //so when attacker tries to use the same refresh token again, it will be revoked and the user will have to log in again
   if (session.refreshTokenHash !== incomingTokenHash) {
     await db
       .update(sessions)
