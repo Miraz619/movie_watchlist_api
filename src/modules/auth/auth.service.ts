@@ -1,4 +1,4 @@
-import { and, eq, isNull, gt } from "drizzle-orm";
+import { and, eq, isNull, gt,ne } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { users } from "../../db/schema/users.js";
 import type { LoginInput } from "./auth.validation.js";
@@ -96,6 +96,122 @@ await db.insert(sessions).values({
 
 
 //refresh access token using refresh token
+// const refreshToken = async (token: string) => {
+//   const decoded = jwtUtils.verifyToken(
+//     token,
+//     config.jwt_refresh_secret,
+//   );
+
+//   const userId = z.uuid().safeParse(decoded.sub);
+
+//   if (!userId.success) {
+//     throw new AppError(401, "Invalid refresh token");
+//   }
+
+//   const sessionId = z.uuid().safeParse(decoded.sid);
+
+//   if (!sessionId.success) {
+//     throw new AppError(401, "Invalid refresh token");
+//   }
+
+//   const [session] = await db
+//     .select({
+//       userId: sessions.userId,
+//       refreshTokenHash: sessions.refreshTokenHash,
+//       expiresAt: sessions.expiresAt,
+//       revokedAt: sessions.revokedAt,
+//     })
+//     .from(sessions)
+//     .where(eq(sessions.id, sessionId.data));
+
+//   if (!session) {
+//     throw new AppError(401, "Session not found. Please log in again");
+//   }
+
+//   if (session.userId !== userId.data) {
+//     throw new AppError(401, "Invalid session");
+//   }
+
+//   if (session.revokedAt !== null) {
+//     throw new AppError(401, "Session has been signed out");
+//   }
+
+//   if (session.expiresAt.getTime() <= Date.now()) {
+//     throw new AppError(401, "Session expired. Please log in again");
+//   }
+
+//   const incomingTokenHash = hashToken(token);
+
+//   if (session.refreshTokenHash !== incomingTokenHash) {
+//     throw new AppError(401, "Refresh token is no longer valid");
+//   }
+
+//   const [user] = await db
+//     .select({
+//       id: users.id,
+//       role: users.role,
+//       isActive: users.isActive,
+//     })
+//     .from(users)
+//     .where(eq(users.id, userId.data));
+
+//   if (!user) {
+//     throw new AppError(401, "User no longer exists. Please log in again");
+//   }
+
+//   if (!user.isActive) {
+//     throw new AppError(403, "Your account is inactive");
+//   }
+
+//   const newRefreshToken = jwtUtils.createToken(
+//   {
+//     sub: user.id,
+//     role: user.role,
+//     sid: sessionId.data,
+//     jti: randomUUID(),
+//   },
+//   config.jwt_refresh_secret,
+//   config.jwt_refresh_expires_in as SignOptions["expiresIn"],
+// );
+
+// const newRefreshTokenHash = hashToken(newRefreshToken);
+
+// const [updatedSession] = await db
+//   .update(sessions)
+//   .set({
+//     refreshTokenHash: newRefreshTokenHash,
+//   })
+//   .where(
+//     and(
+//       eq(sessions.id, sessionId.data),
+//       eq(sessions.userId, userId.data),
+//       eq(sessions.refreshTokenHash, incomingTokenHash),
+//       isNull(sessions.revokedAt),
+//       gt(sessions.expiresAt, new Date()),
+//     ),
+//   )
+//   .returning({ id: sessions.id });
+
+// if (!updatedSession) {
+//   throw new AppError(401, "Refresh token already used or session expired");
+// }
+
+//   const accessToken = jwtUtils.createToken(
+//     {
+//       sub: user.id,
+//       role: user.role,
+//       sid: sessionId.data,
+//     },
+//     config.jwt_access_secret,
+//     config.jwt_access_expires_in as SignOptions["expiresIn"],
+//   );
+
+//   return { accessToken, refreshToken: newRefreshToken};
+// };
+
+
+
+
 const refreshToken = async (token: string) => {
   const decoded = jwtUtils.verifyToken(
     token,
@@ -103,14 +219,9 @@ const refreshToken = async (token: string) => {
   );
 
   const userId = z.uuid().safeParse(decoded.sub);
-
-  if (!userId.success) {
-    throw new AppError(401, "Invalid refresh token");
-  }
-
   const sessionId = z.uuid().safeParse(decoded.sid);
 
-  if (!sessionId.success) {
+  if (!userId.success || !sessionId.success) {
     throw new AppError(401, "Invalid refresh token");
   }
 
@@ -133,17 +244,43 @@ const refreshToken = async (token: string) => {
   }
 
   if (session.revokedAt !== null) {
-    throw new AppError(401, "Session has been signed out");
+    throw new AppError(401, "Session has been revoked");
   }
 
-  if (session.expiresAt.getTime() <= Date.now()) {
+  const remainingSeconds = Math.floor(
+    (session.expiresAt.getTime() - Date.now()) / 1000,
+  );
+
+  if (remainingSeconds <= 0) {
     throw new AppError(401, "Session expired. Please log in again");
+  }
+
+  if (!session.refreshTokenHash) {
+    throw new AppError(401, "Please log in again");
   }
 
   const incomingTokenHash = hashToken(token);
 
   if (session.refreshTokenHash !== incomingTokenHash) {
-    throw new AppError(401, "Refresh token is no longer valid");
+    await db
+      .update(sessions)
+      .set({
+        revokedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(sessions.id, sessionId.data),
+          eq(sessions.userId, userId.data),
+          isNull(sessions.revokedAt),
+          gt(sessions.expiresAt, new Date()),
+          ne(sessions.refreshTokenHash, incomingTokenHash),
+        ),
+      );
+
+    throw new AppError(
+      401,
+      "Refresh token reuse detected. Please log in again",
+    );
   }
 
   const [user] = await db
@@ -164,37 +301,57 @@ const refreshToken = async (token: string) => {
   }
 
   const newRefreshToken = jwtUtils.createToken(
-  {
-    sub: user.id,
-    role: user.role,
-    sid: sessionId.data,
-    jti: randomUUID(),
-  },
-  config.jwt_refresh_secret,
-  config.jwt_refresh_expires_in as SignOptions["expiresIn"],
-);
+    {
+      sub: user.id,
+      role: user.role,
+      sid: sessionId.data,
+      jti: randomUUID(),
+    },
+    config.jwt_refresh_secret,
+    remainingSeconds,
+  );
 
-const newRefreshTokenHash = hashToken(newRefreshToken);
+  const newRefreshTokenHash = hashToken(newRefreshToken);
 
-const [updatedSession] = await db
-  .update(sessions)
-  .set({
-    refreshTokenHash: newRefreshTokenHash,
-  })
-  .where(
-    and(
-      eq(sessions.id, sessionId.data),
-      eq(sessions.userId, userId.data),
-      eq(sessions.refreshTokenHash, incomingTokenHash),
-      isNull(sessions.revokedAt),
-      gt(sessions.expiresAt, new Date()),
-    ),
-  )
-  .returning({ id: sessions.id });
+  const [updatedSession] = await db
+    .update(sessions)
+    .set({
+      refreshTokenHash: newRefreshTokenHash,
+    })
+    .where(
+      and(
+        eq(sessions.id, sessionId.data),
+        eq(sessions.userId, userId.data),
+        eq(sessions.refreshTokenHash, incomingTokenHash),
+        isNull(sessions.revokedAt),
+        gt(sessions.expiresAt, new Date()),
+      ),
+    )
+    .returning({
+      id: sessions.id,
+    });
 
-if (!updatedSession) {
-  throw new AppError(401, "Refresh token already used or session expired");
-}
+  if (!updatedSession) {
+    await db
+      .update(sessions)
+      .set({
+        revokedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(sessions.id, sessionId.data),
+          eq(sessions.userId, userId.data),
+          isNull(sessions.revokedAt),
+          gt(sessions.expiresAt, new Date()),
+          ne(sessions.refreshTokenHash, incomingTokenHash),
+        ),
+      );
+
+    throw new AppError(
+      401,
+      "Refresh token already used or session expired. Please log in again",
+    );
+  }
 
   const accessToken = jwtUtils.createToken(
     {
@@ -206,11 +363,12 @@ if (!updatedSession) {
     config.jwt_access_expires_in as SignOptions["expiresIn"],
   );
 
-  return { accessToken, refreshToken: newRefreshToken};
+  return {
+    accessToken,
+    refreshToken: newRefreshToken,
+    refreshTokenMaxAge: remainingSeconds * 1000,
+  };
 };
-
-
-
 
 
 
