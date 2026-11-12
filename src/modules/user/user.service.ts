@@ -192,10 +192,28 @@ const deleteUserFromDB = async (
   }
 };
 
+
+const getAllUsersFromDB = async () => {
+  const allUsers = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      isActive: users.isActive,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    })
+    .from(users);
+
+  return allUsers;
+};
+
 export const userService = {
   registerUserIntoDB,
   getMyProfileFromDB,
   updateMyProfileInDB,
+  getAllUsersFromDB,
   deleteMyProfileFromDB,
   deleteUserFromDB,
 };

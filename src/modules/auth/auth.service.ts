@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, gt } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { users } from "../../db/schema/users.js";
 import type { LoginInput } from "./auth.validation.js";
@@ -10,6 +10,7 @@ import { SignOptions } from "jsonwebtoken";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { sessions } from "../../db/schema/sessions.js";
+import { hashToken } from "../../utils/hashToken.js";
 
 //login user
 
@@ -46,10 +47,17 @@ const accessToken = jwtUtils.createToken(
 
 // Refresh token
 const refreshToken = jwtUtils.createToken(
-  jwtPayload,
+  {
+    ...jwtPayload,
+    jti: randomUUID(),
+  },
   config.jwt_refresh_secret,
   config.jwt_refresh_expires_in as SignOptions["expiresIn"]
 );
+
+
+
+const refreshTokenHash = hashToken(refreshToken);
 
 const refreshPayload = jwtUtils.verifyToken(
   refreshToken,
@@ -63,6 +71,7 @@ if (typeof refreshPayload.exp !== "number") {
 await db.insert(sessions).values({
   id: sessionId,
   userId: user.id,
+  refreshTokenHash,
   expiresAt: new Date(refreshPayload.exp * 1000),
 });
 
@@ -93,43 +102,49 @@ const refreshToken = async (token: string) => {
     config.jwt_refresh_secret,
   );
 
- 
   const userId = z.uuid().safeParse(decoded.sub);
 
-if (!userId.success) {
-  throw new AppError(401, "Invalid refresh token");
-}
+  if (!userId.success) {
+    throw new AppError(401, "Invalid refresh token");
+  }
 
-const sessionId = z.uuid().safeParse(decoded.sid);
+  const sessionId = z.uuid().safeParse(decoded.sid);
 
-if (!sessionId.success) {
-  throw new AppError(401, "Invalid refresh token");
-}
+  if (!sessionId.success) {
+    throw new AppError(401, "Invalid refresh token");
+  }
 
-const [session] = await db
-  .select({
-    userId: sessions.userId,
-    expiresAt: sessions.expiresAt,
-    revokedAt: sessions.revokedAt,
-  })
-  .from(sessions)
-  .where(eq(sessions.id, sessionId.data));
-  
-if (!session) {
-  throw new AppError(401, "Session not found. Please log in again");
-}
+  const [session] = await db
+    .select({
+      userId: sessions.userId,
+      refreshTokenHash: sessions.refreshTokenHash,
+      expiresAt: sessions.expiresAt,
+      revokedAt: sessions.revokedAt,
+    })
+    .from(sessions)
+    .where(eq(sessions.id, sessionId.data));
 
-if (session.userId !== userId.data) {
-  throw new AppError(401, "Invalid session");
-}
+  if (!session) {
+    throw new AppError(401, "Session not found. Please log in again");
+  }
 
-if (session.revokedAt !== null) {
-  throw new AppError(401, "Session has been signed out");
-}
+  if (session.userId !== userId.data) {
+    throw new AppError(401, "Invalid session");
+  }
 
-if (session.expiresAt.getTime() <= Date.now()) {
-  throw new AppError(401, "Session expired. Please log in again");
-}
+  if (session.revokedAt !== null) {
+    throw new AppError(401, "Session has been signed out");
+  }
+
+  if (session.expiresAt.getTime() <= Date.now()) {
+    throw new AppError(401, "Session expired. Please log in again");
+  }
+
+  const incomingTokenHash = hashToken(token);
+
+  if (session.refreshTokenHash !== incomingTokenHash) {
+    throw new AppError(401, "Refresh token is no longer valid");
+  }
 
   const [user] = await db
     .select({
@@ -148,17 +163,50 @@ if (session.expiresAt.getTime() <= Date.now()) {
     throw new AppError(403, "Your account is inactive");
   }
 
-  const accessToken = jwtUtils.createToken(
+  const newRefreshToken = jwtUtils.createToken(
   {
     sub: user.id,
     role: user.role,
     sid: sessionId.data,
+    jti: randomUUID(),
   },
-  config.jwt_access_secret,
-  config.jwt_access_expires_in as SignOptions["expiresIn"],
+  config.jwt_refresh_secret,
+  config.jwt_refresh_expires_in as SignOptions["expiresIn"],
 );
 
-  return { accessToken };
+const newRefreshTokenHash = hashToken(newRefreshToken);
+
+const [updatedSession] = await db
+  .update(sessions)
+  .set({
+    refreshTokenHash: newRefreshTokenHash,
+  })
+  .where(
+    and(
+      eq(sessions.id, sessionId.data),
+      eq(sessions.userId, userId.data),
+      eq(sessions.refreshTokenHash, incomingTokenHash),
+      isNull(sessions.revokedAt),
+      gt(sessions.expiresAt, new Date()),
+    ),
+  )
+  .returning({ id: sessions.id });
+
+if (!updatedSession) {
+  throw new AppError(401, "Refresh token already used or session expired");
+}
+
+  const accessToken = jwtUtils.createToken(
+    {
+      sub: user.id,
+      role: user.role,
+      sid: sessionId.data,
+    },
+    config.jwt_access_secret,
+    config.jwt_access_expires_in as SignOptions["expiresIn"],
+  );
+
+  return { accessToken, refreshToken: newRefreshToken};
 };
 
 

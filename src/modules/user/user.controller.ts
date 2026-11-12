@@ -101,10 +101,25 @@ const deleteUser = catchAsync(
   },
 );
 
+
+const getAllUsers = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const allUsers = await userService.getAllUsersFromDB();
+
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "All users fetched successfully",
+      data: allUsers,
+    });
+  },
+);
+
 export const userController = {
   registerUser,
   getMyProfile,
   updateMyProfile,
   deleteMyProfile,
   deleteUser,
+  getAllUsers,
 };
