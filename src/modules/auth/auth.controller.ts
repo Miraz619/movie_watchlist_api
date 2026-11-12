@@ -39,13 +39,20 @@ const refreshToken = catchAsync(
       throw new AppError(401, "Refresh token required");
     }
 
-    const { accessToken } = await authService.refreshToken(token);
+    const { accessToken, refreshToken } = await authService.refreshToken(token);
 
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
       maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     sendResponse(res, {
